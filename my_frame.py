@@ -1,6 +1,40 @@
-from typing import List, Dict, Union, Optional
-import numpy as np
-from config import MY_DTYPE
+from typing import List, Dict, Union, Optional, Type
+import numpy as np  # type: ignore
+from config import BASE_DATETIME_FORMAT
+import csv
+from datetime import datetime
+
+
+MY_DTYPE = Type[Union[float, int, str, np.datetime64]]
+
+
+def read_csv(filename, sep=',', header=True, dtypes=None, usecols=None, index_col=None,
+             datetime_format=BASE_DATETIME_FORMAT):
+    with open(filename) as f:
+        count_feature = len(f.readline().strip().split(sep))
+    with open(filename) as f:
+        reader = csv.reader(f, delimiter=sep)
+        if header:
+            header = next(reader)
+        else:
+            header = range(count_feature)
+        if usecols is None:
+            usecols = header
+
+        data = []
+        for row in reader:
+            obj = {}
+
+            for i, column in enumerate(header):
+                if column not in usecols:
+                    continue
+                obj[column] = row[i]
+            data.append(obj)
+
+    df = MyDataFrame(data, dtypes, datetime_format=datetime_format)
+    if index_col:
+        df.set_index(index_col)
+    return df
 
 
 class MyDataFrame(object):
@@ -22,8 +56,8 @@ class MyDataFrame(object):
             словарь типов для явного задания типа некоторых признаков
     """
     def __init__(self, data: List[Dict[str, Union[float, int, str]]],
-                 dtypes: Optional[Dict[str, MY_DTYPE]] = None):
-
+                 dtypes: Optional[Dict[str, MY_DTYPE]] = None, datetime_format=BASE_DATETIME_FORMAT):
+        self.datetime_format = datetime_format
         if not isinstance(data, list):
             raise TypeError('Invalid data format. Use `List[Dict[str, Union[float, int, str]]]`')
         if not data:
@@ -33,36 +67,41 @@ class MyDataFrame(object):
 
         self.columns = dict(zip(tuple(data[0]), range(len(data[0]))))
         self.indexs = dict(zip(range(len(self.columns)), range(len(self.columns))))
-        self.arrays = [[] for _ in self.columns]
+        arrays: List[List[Union[str, float, np.datetime64, int]]] = [[] for _ in self.columns]
 
         for i, obj in enumerate(data):
             try:
                 for j, column in enumerate(self.columns):
-                    self.arrays[j].append(obj[column])
+                    arrays[j].append(obj[column])
             except KeyError:
                 raise KeyError(f'Отсутствует признак "{column}" на {i}-ом объекте')
-        dtypes = self._get_columns_types(dtypes)
-        self._replace_nan_to_float(dtypes)
-        self.arrays = [np.array(self.arrays[self.columns[column]], dtype=dtypes[column]) for column in self.columns]
+        dtypes = self._get_columns_types(arrays, dtypes)
+        self.arrays = self._transform_to_correct_types(arrays, dtypes)
+        self.astype(dtypes)
 
-    def _replace_nan_to_float(self, dtypes: Dict[str, MY_DTYPE]):
+    def _transform_to_correct_types(self, arrays, dtypes):
+        for column, dtype in dtypes.items():
+            idx_column = self.columns[column]
+            if dtype == np.datetime64:
+                arrays[idx_column] = list(map(
+                    lambda x: datetime.strptime(x, self.datetime_format), arrays[idx_column]))
+            elif dtype in (float, int):
+                arrays[idx_column] = list(map(float, map(
+                    lambda x: 'nan' if x == '' or x is None else x, arrays[idx_column])))
+        return arrays
+
+    def astype(self, dtypes: Dict[str, MY_DTYPE]):
         """
-        Заменяет '' и None на float('nan') в данных (self.arrays)
+        Приводит датафрейм к типам данных из dtypes
         :param dtypes: словарь типов для явного задания типа некоторых признаков
         """
-        # print(dtypes)
         for column, dtype in dtypes.items():
-            # print(column)
-            # print(dtype)
-            if dtype != float:
-                continue
             idx_column = self.columns[column]
-            self.arrays[idx_column] = list(map(
-                lambda x: float('nan') if x == '' or x is None else x, self.arrays[idx_column]))
+            self.arrays[idx_column] = np.array(self.arrays[idx_column], dtype)
 
-    def _get_columns_types(self, dtypes: Optional[Dict[str, MY_DTYPE]] = None) -> Dict[str, MY_DTYPE]:
+    def _get_columns_types(self, arrays, dtypes: Dict[str, MY_DTYPE] = None) -> Dict[str, MY_DTYPE]:
         """
-        Определяет валидный тип признаков (int, float, str)
+        Определяет валидный тип признаков (int, float, str, np.datetime64)
         :param dtypes: словарь типов для явного задания типа некоторых признаков
         :return: словарь типов для явного задания типа всех признаков
         """
@@ -71,20 +110,29 @@ class MyDataFrame(object):
             if column in dtypes:
                 continue
 
-            dtype = int
-            one_feature_objects = self.arrays[i]
+            dtype: Optional[MY_DTYPE] = None
+            one_feature_objects = arrays[i]
             for obj in one_feature_objects:
 
-                if not isinstance(obj, (float, int, str)):
+                if not isinstance(obj, (float, int, str, np.datetime64)):
                     raise TypeError(f'Неправильный тип данных "{obj}: {type(obj)}". '
-                                    f'Возможны только int, float, str')
+                                    f'Возможны только int, float, str, np.datetime64')
 
-                if dtype == int and isinstance(obj, int):
+                if (not dtype or dtype == int) and isinstance(obj, int):
+                    dtype = int
                     continue
-
-                elif dtype != str:
+                elif not dtype or dtype == np.datetime64:
+                    try:
+                        datetime.strptime(obj, self.datetime_format)
+                        dtype = np.datetime64
+                    except ValueError:
+                        pass
+                if dtype != str:
                     if obj == '' or obj is None or obj != obj:
-                        dtype = float
+                        if dtype:
+                            dtype = float
+                        continue
+                    if dtype == np.datetime64:
                         continue
                     try:
                         if isinstance(obj, str):
@@ -92,10 +140,20 @@ class MyDataFrame(object):
                     except ValueError:
                         dtype = str
                         continue
+                    if isinstance(obj, float):
+                        if obj.is_integer() and dtype != float:
+                            dtype = int
+                        else:
+                            dtype = float
 
-                    if isinstance(obj, float) and not obj.is_integer():
-                        dtype = float
-                else:
-                    dtype = str
-            dtypes[column] = dtype
+            dtypes[column] = dtype or str
         return dtypes
+
+    def set_index(self, key):
+        try:
+            idx_columns = self.columns.pop(key)
+            self.indexs = dict(zip(self.arrays.pop(idx_columns), range(len(self.columns))))
+            self.columns = dict(zip(self.columns, range(len(self.columns))))
+        except KeyError:
+            raise KeyError('Incorrect index column name')
+        return self

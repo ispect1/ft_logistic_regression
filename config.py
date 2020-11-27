@@ -1,4 +1,1 @@
-from typing import Type, Union
-
-
-MY_DTYPE = Type[Union[float, int, str]]
+BASE_DATETIME_FORMAT = '%Y-%m-%d'
