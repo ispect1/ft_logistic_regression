@@ -1,0 +1,305 @@
+"""MyDataFrame class"""
+from typing import List, Dict, Union, Optional, Type, Set
+import csv
+from datetime import datetime
+import math
+import numpy as np  # type: ignore
+from utils import mean, std, var, mmin, mmax, count, quantile
+from config import BASE_DATETIME_FORMAT, TYPE_MAPPING
+
+
+MYDTYPE = Type[Union[float, int, str, datetime]]
+
+
+def read_csv(filename, sep=',', header=True, dtypes=None, usecols=None, index_col=None,
+             datetime_format=BASE_DATETIME_FORMAT):
+    """
+
+    Args:
+        filename:
+        sep:
+        header:
+        dtypes:
+        usecols:
+        index_col:
+        datetime_format:
+
+    Returns:
+
+    """
+    with open(filename) as file_descriptor:
+        count_feature = len(file_descriptor.readline().strip().split(sep))
+
+    with open(filename) as file_descriptor:
+        reader = csv.reader(file_descriptor, delimiter=sep)
+        if header:
+            header = next(reader)
+        else:
+            header = range(count_feature)
+        if usecols is None:
+            usecols = header
+
+        data = []
+        for row in reader:
+            data.append({column: row[i]
+                         for i, column in enumerate(header) if column not in usecols})
+
+    data_frame = MyDataFrame(data, dtypes, datetime_format=datetime_format)
+    if index_col:
+        data_frame.set_index(index_col)
+    return data_frame
+
+
+class MyDataFrame:
+    """
+    Наивная реализация pd.DataFrame. Данные внутри него хранятся в виде набора трех элементов:
+            Кортеж `название - номер` признаков (колонки)
+            Кортеж `название - номер` объектов (индексы)
+            Список numpy массивов данных
+                (n-ый массив соответсвует n-ому признаков,
+                n-ый элемент m-ого массива соответует n-ому объектов m-ого признака)
+
+    Названия колонок определяются по первому объекту,
+        остальные названия других объектов игнорируются
+
+    Данные для инициализации
+        data: Список объектов, каждый объект - словарь `название признака - значение объекта на нем`
+
+        dtypes: словарь типов для явного задания типа некоторых признаков
+
+        datetime_format: формат парсинга даты
+    """
+
+    def __init__(self, data: List[Dict[str, Union[float, int, str, datetime]]],
+                 dtypes: Optional[Dict[str, MYDTYPE]] = None,
+                 datetime_format: str = BASE_DATETIME_FORMAT):
+
+        self.datetime_format = datetime_format
+        if not isinstance(data, list):
+            raise TypeError('Invalid data format. Use `List[Dict[str, Union[float, int, str]]]`')
+        if not data:
+            raise TypeError('Minimal length dataframe - 1')
+        if not data[0]:
+            raise TypeError('Minimal count columns - 1')
+
+        self.columns = {column: i for i, column in enumerate(list(data[0]))}
+        self.indexs: Dict[Union[str, int, float, datetime], 'np.ndarray[int]'] = {
+            i: np.array([i]) for i in range(len(data))}
+
+        dtypes = dtypes or {}
+        self._parse_data(data, dtypes)._transform_to_correct_types().astype(self.dtypes)
+
+    def _parse_data(self, data, dtypes) -> 'MyDataFrame':
+        """
+        Парсит данные исходя из их типов
+        Args:
+            data: Список объектов, каждый объект -
+                словарь `название признака - значение объекта на нем`
+            dtypes: словарь типов для явного задания типа некоторых признаков
+        """
+        arrays: List[List[Union[str, datetime, int, float]]] = [[] for _ in self.columns]
+
+        possibles_dtypes: Dict[str, Set[str]] = {column: {'str', 'int', 'float', 'datetime'}
+                                                 for column in self.columns if column not in dtypes}
+
+        for i, obj in enumerate(data):
+            try:
+                for j, column in enumerate(self.columns):
+                    if column not in possibles_dtypes:
+                        continue
+
+                    curr_possible_dtypes = possibles_dtypes[column]
+                    x_i_j = obj[column]
+
+                    if not isinstance(x_i_j, (float, int, str, np.datetime64, datetime)):
+                        raise TypeError(f'Неправильный тип данных "{obj}: {type(obj)}". '
+                                        f'Возможны только int, float, str, np.datetime64')
+
+                    if 'float' in curr_possible_dtypes:
+                        try:
+                            x_i_j = float(x_i_j) if x_i_j else x_i_j
+                        except ValueError:
+                            curr_possible_dtypes.remove('float')
+
+                    if 'int' in curr_possible_dtypes:
+                        try:
+                            if isinstance(x_i_j, float) and not x_i_j.is_integer():
+                                raise ValueError
+                            x_i_j = int(x_i_j)
+                        except ValueError:
+                            curr_possible_dtypes.remove('int')
+
+                    if 'datetime' in curr_possible_dtypes and isinstance(x_i_j, str):
+                        try:
+                            x_i_j = datetime.strptime(x_i_j, self.datetime_format)
+                        except ValueError:
+                            curr_possible_dtypes.remove('datetime')
+
+                    arrays[j].append(x_i_j)
+            except KeyError as exc:
+                raise KeyError(f'Отсутствует признак "{column}" на {i}-ом объекте') from exc
+
+        self.dtypes = ({column:
+                        sorted(dtypes,
+                               key=lambda x: {'int': 0, 'float': 1, 'datetime': 2, 'str': 3}[x])[0]
+                        for column, dtypes in possibles_dtypes.items()})
+        self.arrays = arrays
+        return self
+
+    def _transform_to_correct_types(self):
+        """
+        Преобразовывает признаки и названия типов датафрейма в корректный формат
+        """
+        for column, dtype_name in self.dtypes.items():
+            idx_column = self.columns[column]
+            if dtype_name == 'datetime':
+                self.arrays[idx_column] = list(map(
+                    lambda x: datetime.strptime(x, self.datetime_format)
+                    if isinstance(x, str) else x,
+                    self.arrays[idx_column]))
+            elif dtype_name in ('float', 'int'):# and
+                  # sum(bool(x) and bool(not math.isnan(x))for x in self.arrays[idx_column])):
+                self.arrays[idx_column] = list(map(float, map(
+                    lambda x: 'nan' if x == '' or x is None else x, self.arrays[idx_column])))
+            else:
+                self.dtypes[column] = 'str'
+            if isinstance(self.dtypes[column], str):
+                self.dtypes[column] = TYPE_MAPPING[self.dtypes[column]]
+        return self
+
+    def astype(self, dtypes: Dict[str, MYDTYPE]) -> 'MyDataFrame':
+        """
+        Приводит датафрейм к типам данных из dtypes
+        Args:
+            dtypes: словарь типов для явного задания типа некоторых признаков
+        """
+
+        for column, dtype in dtypes.items():
+            idx_column = self.columns[column]
+            self.arrays[idx_column] = np.array(self.arrays[idx_column], dtype)
+        return self
+
+    def set_index(self, key: str) -> 'MyDataFrame':
+        """
+        Делает объекты с колонкой `key` индексами. Удяляет предыдущие индексы
+        Поддерживает несколько обхектов с одним индекском
+        Args:
+            key: название колонки
+        """
+        try:
+            idx_columns = self.columns.pop(key)
+            new_indexs = self.arrays.pop(idx_columns)
+            self.indexs = {}
+            for i, index in enumerate(new_indexs):
+                self.indexs[index] = self.indexs.get(index, []) + [i]
+            self.indexs = {name: np.array(idx) for name, idx in self.indexs.items()}
+            self.columns = dict(zip(self.columns, range(len(self.columns))))
+        except KeyError as exc:
+            raise KeyError(f'Incorrect index column name "{key}"') from exc
+        return self
+
+    def _calc_helper(self):
+        pass
+
+    def _calc_params(self, func_name, axis, only_numbers,
+                     dropna=True) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Применяет функцию к строкам или столбцам
+        Args:
+            func_name: функцию, которую нужно применить к данным
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        if axis not in (0, 1):
+            raise np.AxisError('Axis может быть равен 0 (колонки) или 1 (индексы)')
+        res = {}
+        if axis == 0:
+            for column in self.columns:
+                if only_numbers and self.dtypes[column] not in (int, float):
+                    continue
+                array = self.arrays[self.columns[column]]
+                if dropna and self.dtypes[column] in (int, float):
+                    array = array[~np.isnan(array)]
+                res[column] = func_name(array)
+            return res
+        for name, one_name_indexs in self.indexs.items():
+            arrays_elements = []
+            for array in self.arrays:
+                arrays_elements.extend(array[one_name_indexs])
+            arrays_elements = [el for el in arrays_elements
+                               if (not isinstance(el, (int, float, np.float, np.integer)) and not only_numbers)
+                               or (isinstance(el, (int, float, np.float, np.integer)) and not math.isnan(el))]
+            res[name] = func_name(arrays_elements)
+
+        return res
+
+    def count(self, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Кол-во объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(count, axis, False)
+
+    def mean(self, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Среднее значение объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(mean, axis, True)
+
+    def std(self, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Стандартное отклонение объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(std, axis, True)
+
+    def var(self, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Дисперсия объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(var, axis, True)
+
+    def min(self, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Минимальное значение объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(mmin, axis, True)
+
+    def max(self, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Максимальное значение объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(mmax, axis, True)
+
+    def quantile(self, q=0.5, axis=0) -> Dict[Union[str, int, float, datetime], float]:
+        """
+        Максимальное значение объектов по заданной оси
+        Args:
+            axis: ось; 0 - столбцы, 1 - строки
+        Returns:
+            Словарь столбец/строка: посчитанное значение по объектов данного ключа
+        """
+        return self._calc_params(lambda x: quantile(x, q=q), axis, True)

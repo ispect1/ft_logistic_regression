@@ -1,1 +1,6 @@
 numpy
+mypy
+pylint
+matplotlib
+mypy
+pylint
