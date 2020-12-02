@@ -31,8 +31,12 @@ def print_describe_matrix(mdf, is_transpose=False):
     row_format = "|{:<12}" * (len(columns) + 1)
     print(row_format.format("", *map(_transform_string, columns)) + '|')
     for name, row in data.items():
-        sorted_row = [f'{row[column]}'[:9] for column in row]
-        print(row_format.format(_transform_string(name), *sorted_row) + '|')
+        try:
+            sorted_row = [f'{row[column]}'[:9] for column in row]
+            print(row_format.format(
+                _transform_string(name), *sorted_row) + '|')
+        except Exception:  # pylint: disable=broad-except
+            print(f'Невозможно посчитать метрику {name} для {row}')
 
 
 if __name__ == '__main__':
@@ -45,4 +49,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     table = read_csv_saving(args.filename)
 
-    print_describe_matrix(table, is_transpose=args.transpose)
+    try:
+        print_describe_matrix(table, is_transpose=args.transpose)
+    except Exception as err:  # pylint: disable=broad-except
+        print("Невозможно построить матрицу. Проверьте вводные параметры."
+              "Error '{0}' occured. Arguments {1}.".format(err, err.args))

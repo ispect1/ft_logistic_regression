@@ -5,9 +5,9 @@ import sys
 import itertools
 from datetime import datetime
 import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
 from utils import mean, std, var, mmin, mmax, quantile
 from config import BASE_DATETIME_FORMAT, TYPE_MAPPING
-import pandas as pd
 
 
 def read_csv(filename, sep=',', header=True, dtypes=None,  # pylint: disable=too-many-arguments
@@ -62,6 +62,7 @@ def read_csv_saving(filename, **kwargs) -> 'MyTable':
     Returns:
 
     """
+
     try:
         table = read_csv(filename, **kwargs)
     except FileNotFoundError:
@@ -69,6 +70,9 @@ def read_csv_saving(filename, **kwargs) -> 'MyTable':
         sys.exit()
     except TypeError as err:
         print(err.args[0])
+        sys.exit()
+    except KeyError:
+        print('Enter valid index column')
         sys.exit()
 
     except Exception as err:  # pylint: disable=broad-except
@@ -121,7 +125,6 @@ class MyTable:
 
     def __getitem__(self, item):
         if isinstance(item, List):
-            print(item)
             return {column: self.arrays[self.columns[column]] for column in item}
         return self.arrays[self.columns[item]]
 
@@ -133,6 +136,9 @@ class MyTable:
 
     @property
     def index(self):
+        """
+        Получить словарь индексов
+        """
         return self.indexs
 
     @property
@@ -202,7 +208,7 @@ class MyTable:
 
     def _transform_to_correct_types(self, dtypes):
         """
-        Преобразовывает признаки и названия типов датафрейма в корректный формат
+        Преобразовывает признаки и названия типов в корректный формат
         """
         for column, dtype_name in dtypes.items():
             idx_column = self.columns[column]
@@ -231,7 +237,8 @@ class MyTable:
         for column, dtype in dtypes.items():
             idx_column = self.columns[column]
             self.arrays[idx_column] = np.array(self.arrays[idx_column], dtype)
-        self.dtypes = {column: self.arrays[idx].dtype for column, idx in self.columns.items()}
+        self.dtypes = {column: self.arrays[idx].dtype
+                       for column, idx in self.columns.items()}
         return self
 
     def set_index(self, key: str) -> 'MyTable':
@@ -247,7 +254,8 @@ class MyTable:
             self.indexs = {}
             for i, index in enumerate(new_indexs):
                 self.indexs[index] = self.indexs.get(index, []) + [i]
-            self.indexs = {name: np.array(idx) for name, idx in self.indexs.items()}
+            self.indexs = {name: np.array(idx)
+                           for name, idx in self.indexs.items()}
             self.columns = dict(zip(self.columns, range(len(self.columns))))
             self.dtypes.pop(key)
         except KeyError as exc:
@@ -257,7 +265,8 @@ class MyTable:
     def _calc_helper(self):
         pass
 
-    def _calc_params(self, func_name: Callable[[Sequence], float]) -> Dict[str, float]:
+    def _calc_params(self, func_name: Callable[[Sequence],
+                                               float]) -> Dict[str, float]:
         """
         Применяет функцию к столбцам
         Args:
@@ -348,6 +357,18 @@ class MyTable:
         Returns:
             Словарь статистик
         """
-        return {'count': self.count(), 'mean': self.mean(), 'std': self.std(), 'min': self.min(),
-                '25%': self.quantile(0.25), '50%': self.quantile(0.5), '75%': self.quantile(0.75),
+        return {'count': self.count(), 'mean': self.mean(),
+                'std': self.std(), 'min': self.min(),
+                '25%': self.quantile(0.25), '50%': self.quantile(0.5),
+                '75%': self.quantile(0.75),
                 'max': self.max()}
+
+    def to_frame(self) -> pd.DataFrame:
+        """
+        Транформ таблицы в pd.DataFrame формат
+        """
+        table = pd.DataFrame({column: self.arrays[self.columns[column]]
+                              for column in self.columns})
+        table.index = table.index.map(
+            {i: line for line, lst in self.index.items() for i in lst})
+        return table

@@ -1,0 +1,9 @@
+**/.idea
+venv
+model_data.json
+scaler.json
+**/.ipynb_checkpoints
+*.ipynb
+**/__pycache__
+.mypy_cache
+*.png
