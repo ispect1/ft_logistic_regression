@@ -27,3 +27,7 @@ class Comparable(Protocol):
 
     def __ge__(self: Comp, other: Comp) -> bool:
         return not self < other
+
+
+class NotFittedError(Exception):
+    pass

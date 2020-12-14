@@ -1,11 +1,12 @@
+#!/usr/bin/env python3
 """Histogram"""
 import math
 import sys
 from matplotlib import pyplot as plt  # type: ignore
 import seaborn as sns  # type: ignore
-from my_frame import read_csv_saving
+from models.my_frame import read_csv_saving
 from config import HISTOGRAM_VALID_COLUMN, COURSE_COLUMN
-from utils import init_argparser, show_graph
+from utils.helper import init_argparser, show_graph
 
 
 if __name__ == '__main__':

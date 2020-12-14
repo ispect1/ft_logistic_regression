@@ -1,13 +1,14 @@
 """MyTable class"""
-from typing import List, Dict, Union, Optional, Set, Callable, Sequence, Type, Iterator, Any
+from typing import List, Dict, Union, Optional, Set, Callable, Sequence, Type, Iterator, Any, Iterable
 import csv
 import sys
 import itertools
 from datetime import datetime
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from utils import mean, std, var, mmin, mmax, quantile
+from utils.ft_math import mean, std, var, mmin, mmax, quantile
 from config import BASE_DATETIME_FORMAT, TYPE_MAPPING
+import operator
 
 
 def read_csv(filename, sep=',', header=True, dtypes=None,  # pylint: disable=too-many-arguments
@@ -106,27 +107,40 @@ class MyTable:
                  dtypes: Optional[Dict[str, Type]] = None,
                  datetime_format: str = BASE_DATETIME_FORMAT):
 
+        self.dtypes: Dict[str, Type] = {}
+        self.indexs: Dict[Union[str, int, float, datetime], 'np.ndarray[int]'] = {
+            i: np.array([i]) for i in range(len(data))}
         self.datetime_format = datetime_format
         if not isinstance(data, list):
             raise TypeError('Invalid data format. Use `List[Dict[str, Union[float, int, str]]]`')
         if not data:
-            raise TypeError('Minimal length dataframe - 1')
+            self.columns = {}
+            return
+            # raise TypeError('Minimal length dataframe: 1')
         if not data[0]:
-            raise TypeError('Minimal count columns - 1')
+            raise TypeError('Minimal count columns: 1')
 
         self.columns = {column: i for i, column in enumerate(list(data[0]))}
-        self.indexs: Dict[Union[str, int, float, datetime], 'np.ndarray[int]'] = {
-            i: np.array([i]) for i in range(len(data))}
 
         dtypes = dtypes or {}
-        self.dtypes: Dict[str, Type] = {}
         dtypes = self._parse_data(data, dtypes)
         self._transform_to_correct_types(dtypes)
 
     def __getitem__(self, item):
-        if isinstance(item, List):
-            return {column: self.arrays[self.columns[column]] for column in item}
+        if isinstance(item, list):
+            columns = list(self.columns)
+            new_df = MyTable([])
+            new_df.columns = {column: i for i, column in enumerate(item)}
+            new_df.indexs = self.indexs.copy()
+            new_df.dtypes = {column: dtype for column, dtype in self.dtypes.items() if column in item}
+            new_df.arrays = [arr for i, arr in enumerate(self.arrays) if columns[i] in item]
+            return new_df
         return self.arrays[self.columns[item]]
+
+    # def __getitem__(self, item):
+    #     if isinstance(item, list):
+    #         return {column: self.arrays[self.columns[column]] for column in item}
+    #     return self.arrays[self.columns[item]]
 
     def __iter__(self):
         return iter(self.columns)
@@ -174,10 +188,6 @@ class MyTable:
                 except KeyError:
                     x_i_j = float('nan')
 
-                # if not isinstance(x_i_j, (float, int, str, np.datetime64, datetime)):
-                #     raise TypeError(f'Неправильный тип данных "{obj}: {type(obj)}". '
-                #                     f'Возможны только int, float, str, np.datetime64')
-
                 if 'float' in curr_possible_dtypes:
                     try:
                         x_i_j = float(x_i_j) if x_i_j else x_i_j
@@ -187,7 +197,7 @@ class MyTable:
                 if 'int' in curr_possible_dtypes:
                     try:
                         if isinstance(x_i_j, float) and not x_i_j.is_integer():
-                            raise ValueError
+                            raise ValueError()
                         x_i_j = int(x_i_j)
                     except ValueError:
                         curr_possible_dtypes.remove('int')
@@ -261,9 +271,6 @@ class MyTable:
         except KeyError as exc:
             raise KeyError(f'Incorrect index column name "{key}"') from exc
         return self
-
-    def _calc_helper(self):
-        pass
 
     def _calc_params(self, func_name: Callable[[Sequence],
                                                float]) -> Dict[str, float]:
@@ -349,7 +356,7 @@ class MyTable:
             Список колонок
         """
         return [column for column, dtype in self.dtypes.items()
-                if np.issubsctype(float, dtype) or np.issubsctype(int, dtype)]
+                if (np.issubsctype(float, dtype) or np.issubsctype(int, dtype)) and (~np.isnan(self.arrays[self.columns[column]])).sum()]
 
     def describe(self) -> Dict[str, Dict[str, float]]:
         """
@@ -372,3 +379,42 @@ class MyTable:
         table.index = table.index.map(
             {i: line for line, lst in self.index.items() for i in lst})
         return table
+
+    def fillna(self, value, subset=None):
+        subset = subset or self.columns
+        for column in subset:
+            self.arrays[self.columns[column]] = np.nan_to_num(self.arrays[self.columns[column]], nan=value)
+        return self
+
+    def _help_magic_method(self, f, other):
+        if isinstance(other, (int, float, np.int, np.float)):
+            self.arrays = [f(arr, other) for arr in self.arrays]
+        elif isinstance(other, (list, tuple, np.ndarray)):
+            if len(other) == len(self.arrays):
+                self.arrays = [f(arr, other[i]) for i, arr in enumerate(self.arrays)]
+            elif len(self.arrays) and len(self.arrays[0]) == len(other):
+                raise NotImplementedError
+            else:
+                ValueError('Несоместимые размеры')
+        else:
+            TypeError('Недопустимый тип входных данных')
+
+    def __add__(self, other):
+        self._help_magic_method(operator.add, other)
+        return self
+
+    def __sub__(self, other):
+        self._help_magic_method(operator.sub, other)
+        return self
+
+    def __mul__(self, other):
+        self._help_magic_method(operator.mul, other)
+        return self
+
+    def __truediv__(self, other):
+        self._help_magic_method(operator.truediv, other)
+        return self
+
+    @property
+    def values(self):
+        return np.array(self.arrays).T

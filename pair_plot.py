@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 """Pair plot"""
 import sys
 import seaborn as sns  # type: ignore
 from config import COURSE_COLUMN
-from my_frame import read_csv_saving
-from utils import init_argparser, show_graph
+from models.my_frame import read_csv_saving
+from utils.helper import init_argparser, show_graph
 
 
 if __name__ == '__main__':
@@ -15,6 +16,9 @@ if __name__ == '__main__':
     sns.set_theme(style="ticks")
 
     try:
+        if COURSE_COLUMN not in df:
+            print(f'Признак {COURSE_COLUMN} отсутвует. Введите другой файл')
+            sys.exit()
         plot = sns.pairplot(data=df, hue=COURSE_COLUMN)
     except Exception as err:  # pylint: disable=broad-except
         print("Невозможно построить график, проверьте вводные параметры. "
