@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Print describe matrix"""
 import argparse
-from models.my_frame import read_csv_saving
+from models.my_frame import HogwartsFrame
 
 
 def _transform_string(line):
@@ -18,21 +18,19 @@ def print_describe_matrix(mdf, is_transpose=False):
     Returns:
 
     """
-    columns = mdf.get_numbers_features()
 
     data = mdf.describe()
-    data = {key: dict(sorted(values.items(), key=lambda x: mdf.columns[x[0]]))
-            for key, values in data.items()}
+    columns = data.columns
+    index = data.index
 
     if is_transpose:
-        data, columns = {column: {name: values[column]
-                                  for name, values in data.items()}
-                         for column in columns}, list(data)
+        data = data.T
+        index = columns
     row_format = "|{:<12}" * (len(columns) + 1)
-    print(row_format.format("", *map(_transform_string, columns)) + '|')
+    print(row_format.format("", *map(_transform_string, index)) + '|')
     for name, row in data.items():
         try:
-            sorted_row = [f'{row[column]}'[:9] for column in row]
+            sorted_row = [f'{value}'[:9] for value in row.values]
             print(row_format.format(
                 _transform_string(name), *sorted_row) + '|')
         except Exception:  # pylint: disable=broad-except
@@ -47,7 +45,7 @@ if __name__ == '__main__':
                         help='Transpose describe matrix', action='store_true')
 
     args = parser.parse_args()
-    table = read_csv_saving(args.filename)
+    table = HogwartsFrame.read_csv(args.filename)
 
     try:
         print_describe_matrix(table, is_transpose=args.transpose)

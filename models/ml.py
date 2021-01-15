@@ -4,7 +4,10 @@ import numpy as np  # type: ignore
 from config import ETA, MAX_ITER
 
 from utils.ft_math import mean, std
-from utils.ft_typing import NotFittedError
+
+
+class NotFittedError(Exception):
+    pass
 
 
 class Saver:
@@ -78,7 +81,9 @@ class MyLogisticRegression(Saver):
     def _sigmoid(margin):
         return 1 / (1 + np.exp(-margin))
 
-    def stochastic_gradient_step(self, matrix, y_true, weight, train_ind, eta=0.01):  # pylint: disable=too-many-arguments
+    def stochastic_gradient_step(
+            self, matrix, y_true, weight, train_ind,
+            eta=0.01):  # pylint: disable=too-many-arguments
         """
 
         Args:
@@ -115,7 +120,9 @@ class MyLogisticRegression(Saver):
     def _binarization_y(y_true, positive_class_name):
         return np.where(y_true == positive_class_name, 1, -1)
 
-    def fit(self, matrix, y_true, eta=ETA, max_iter=MAX_ITER,  # pylint: disable=too-many-arguments
+    def fit(
+            self, matrix, y_true, eta=ETA,
+            max_iter=MAX_ITER,  # pylint: disable=too-many-arguments
             max_weight_dist=None, seed=None, mode='stochastic'):
         """
 
@@ -152,10 +159,11 @@ class MyLogisticRegression(Saver):
                 iter_num += 1
                 if mode == 'stochastic':
                     random_ind = random.randint(0, len(scaler_matrix) - 1)
-                    weight = self.stochastic_gradient_step(scaler_matrix, bin_y, weight,
-                                                           random_ind, eta=eta)
+                    weight = self.stochastic_gradient_step(
+                        scaler_matrix, bin_y, weight, random_ind, eta=eta)
                 else:
-                    weight = self.full_gradient_step(scaler_matrix, bin_y, weight, eta=eta)
+                    weight = self.full_gradient_step(
+                        scaler_matrix, bin_y, weight, eta=eta)
 
             self.w.append(weight)
         self.w = np.array(self.w)
@@ -196,7 +204,8 @@ class MyLogisticRegression(Saver):
         """
         if not self._is_trained:
             raise NotFittedError()
-        return np.array([self._predict_one(x) for x in np.insert(matrix, 0, 1, axis=1)])
+        return np.array([self._predict_one(x)
+                         for x in np.insert(matrix, 0, 1, axis=1)])
 
     def predict_proba(self, matrix):
         """
@@ -209,7 +218,8 @@ class MyLogisticRegression(Saver):
         """
         if not self._is_trained:
             raise NotFittedError()
-        return np.array([self._predict_proba_one(x) for x in np.insert(matrix, 0, 1, axis=1)])
+        return np.array([self._predict_proba_one(x)
+                         for x in np.insert(matrix, 0, 1, axis=1)])
 
 
 class Scaler(Saver):
@@ -221,7 +231,8 @@ class Scaler(Saver):
         self.mean = None
         self.count_feature = None
         self._is_trained = False
-        super().__init__(_is_trained=self._is_trained, mean=self.mean, std=self.std,
+        super().__init__(_is_trained=self._is_trained, mean=self.mean,
+                         std=self.std,
                          count_feature=self.count_feature)
 
     def fit(self, matrix):
@@ -263,9 +274,10 @@ class Scaler(Saver):
         """
         if not self._is_trained:
             return matrix
-        assert matrix.shape[1] == self.count_feature, f'X has {matrix.shape[1]} features,' \
-                                                      f'but this scaler is expecting' \
-                                                      f' {self.count_feature} features as input.'
+        assert matrix.shape[1] == self.count_feature,\
+            f'X has {matrix.shape[1]} features, ' \
+            f'but this scaler is expecting ' \
+            f'{self.count_feature} features as input.'
         return (matrix - self.mean) / self.std
 
     def fit_transform(self, matrix):

@@ -3,16 +3,16 @@
 import sys
 import seaborn as sns  # type: ignore
 from config import COURSE_COLUMN
-from models.my_frame import read_csv_saving
+from models.my_frame import HogwartsFrame
 from utils.helper import init_argparser, show_graph
 
 
 if __name__ == '__main__':
     args = init_argparser('Pair plot graphic')
-    df = read_csv_saving(filename=args.filename, usecols=args.usecols,
-                         index_col=args.index_col)
+    df = HogwartsFrame.read_csv(filename=args.filename, usecols=args.usecols,
+                                index_col=args.index_col)
 
-    df = df.to_frame()[df.get_numbers_features() + [COURSE_COLUMN]]
+    df = df[df.number_columns + [COURSE_COLUMN]]
     sns.set_theme(style="ticks")
 
     try:

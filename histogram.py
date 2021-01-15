@@ -4,28 +4,28 @@ import math
 import sys
 from matplotlib import pyplot as plt  # type: ignore
 import seaborn as sns  # type: ignore
-from models.my_frame import read_csv_saving
+from models.my_frame import HogwartsFrame
 from config import HISTOGRAM_VALID_COLUMN, COURSE_COLUMN
 from utils.helper import init_argparser, show_graph
 
 
 if __name__ == '__main__':
     args = init_argparser('Histogram plot graphic')
-    df = read_csv_saving(filename=args.filename, usecols=args.usecols,
-                         index_col=args.index_col)
+    df = HogwartsFrame.read_csv(filename=args.filename, usecols=args.usecols,
+                                index_col=args.index_col)
 
-    columns = df.get_numbers_features()
+    columns = df.number_columns
     n_cols = len(columns) // 2 or 1
     n_rows = math.ceil(len(columns) / n_cols)
 
-    fig = plt.figure(figsize=(16, 13))
-    fig.subplots_adjust(hspace=0.5)
+    fig = plt.figure(figsize=(14, 10))
+    fig.subplots_adjust(hspace=0.7)
     fig.tight_layout()
 
     for plot_num, column in enumerate(columns):
         ax = fig.add_subplot(n_cols, n_rows, plot_num + 1)
         if column == HISTOGRAM_VALID_COLUMN:
-            ax.set_xlabel(column, fontsize=17, color='darkred')
+            ax.set_xlabel(column, fontsize=10, color='darkred')
             ALPHA_TRANSPARENCY = 0.5
         else:
             ALPHA_TRANSPARENCY = 0.25
