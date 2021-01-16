@@ -24,7 +24,7 @@ def main(args):
     table = HogwartsFrame.read_csv(args.filename_data,
                                    index_col=args.index_col)
     y_true = table[args.name_target_column]
-    table = table[table.number_columns]
+    table = table[table.number_columns].fillna(0)
     table = table.values
     scaler_df = scaler.fit_transform(table)
     if not sum(map(lambda x: x == x, y_true)):  # pylint: disable=R0124
@@ -50,8 +50,7 @@ if __name__ == "__main__":
     parser.add_argument('--metric', '-m', dest='metric', action='store_true',
                         help='calculate metric')
     parser.add_argument('--filename_data', '-f', dest='filename_data',
-                        action='store', help='input data file',
-                        default=TRAIN_CSV_FILE)
+                        action='store', help='input data file', required=True)
     parser.add_argument('--name_target_column', '-n',
                         dest='name_target_column',
                         action='store', help='target column naming',
@@ -72,3 +71,4 @@ if __name__ == "__main__":
     except Exception as err:  # pylint: disable=broad-except
         print(f'Неаозможно обучить модель. '
               f'Проверьте вводные параметры и файлы.\n{err.args}')
+        raise err

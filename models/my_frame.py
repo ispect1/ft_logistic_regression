@@ -72,7 +72,7 @@ class HogwartsFrame(pd.DataFrame):
         return items[int(f)] * (c - k) + items[int(c)] * (k - f)
 
     def is_number(self, key):
-        return np.issubdtype(self[key], np.number)
+        return np.issubdtype(self[key], np.number) and self[key].notna().sum()
 
     @property
     def number_columns(self):

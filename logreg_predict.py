@@ -58,4 +58,5 @@ if __name__ == "__main__":
     except Exception as err:  # pylint: disable=broad-except
         print(f'Невозможно посчитать предикт модели.'
               f'Проверьте вводные параметры и файлы.\n{err.args}')
+        raise err
         sys.exit()

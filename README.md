@@ -5,67 +5,93 @@
 
 ## Description
 Naive logistic regression without using third party machine learning libraries (only matplotlib and numpy). Supports full and stochastic gradient descent method, calculation of basic classification metrics, visualization for two-dimensional case, CSV parsing
+
+
+## Describe
+`./describe.py filename` - print describe matrix
+```shell
+usage: describe.py [-h] [-t] filename
+
+Print describe data
+
+positional arguments:
+  filename         CSV filename
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -t, --transpose  Transpose describe matrix
+```
+
+## Plot graphics
+- `histogram.py` - plot histogram
+- `scatter_plot.py` - plot scatter plot
+- `pair_plot.py` - plot pair plot
+```shell
+optional arguments:
+  -h, --help            show this help message and exit
+  --save PLOT_FILENAME, -s PLOT_FILENAME
+                        Save plot to file
+  --index INDEX_COL, -i INDEX_COL
+                        Index column
+  --filename FILENAME, -f FILENAME
+                        CSV Filename
+  --usecols USECOLS [USECOLS ...], -c USECOLS [USECOLS ...]
+                        Used columns
+```
+
 ## Train model
 
-`./train.py` - run train model
-```
-usage: train.py [-h] [--plot] [--metrics] [--filename_data FILENAME_DATA]
-                [--num_target_column NUM_TARGET_COLUMN]
-                [--gradient_mode {stochastic,full}] [--max_iter MAX_ITER]
-                [--eta ETA]
+`./logreg_predict.py` - run train model
+```shell
+usage: logreg_train.py [-h] [--metric] [--filename_data FILENAME_DATA]
+                       [--name_target_column NAME_TARGET_COLUMN]
+                       [--gradient_mode {stochastic,full}]
+                       [--max_iter MAX_ITER] [--eta ETA]
+                       [--index_col INDEX_COL]
+
+Train model
 
 optional arguments:
   -h, --help            show this help message and exit
-  --plot, -p            plot mode (default: False)
-  --metrics, -m         calculate metrics (default: False)
+  --metric, -m          calculate metric (default: False)
   --filename_data FILENAME_DATA, -f FILENAME_DATA
-                        input data file (default: data.csv)
-  --num_target_column NUM_TARGET_COLUMN, -n NUM_TARGET_COLUMN
-                        target column number (default: -1)
+                        input data file (default:
+                        ./datasets/dataset_train.csv)
+  --name_target_column NAME_TARGET_COLUMN, -n NAME_TARGET_COLUMN
+                        target column naming (default: Hogwarts House)
   --gradient_mode {stochastic,full}, -g {stochastic,full}
                         gradient mode (default: stochastic)
   --max_iter MAX_ITER, -i MAX_ITER
-                        max iter steps (default: None)
-  --eta ETA, -e ETA     eta (default: None)
+                        max iter steps (default: 10000)
+  --eta ETA, -e ETA     eta (default: 0.01)
+  --index_col INDEX_COL
+                        index_col (default: None)
 
 ```
 
 
 ## Predict model
 
-`./predict.py` - run predict model
+`./logreg_predict.py` - run predict model
 
 ```
-usage: predict.py [-h] objects [objects ...]
+usage: logreg_predict.py [-h] [--filename_data FILENAME_DATA]
+                         [--index_col INDEX_COL]
 
-positional arguments:
-  objects     Various objects for predict. Separate the signs of one object
-              with a comma
+Predict model
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help            show this help message and exit
+  --filename_data FILENAME_DATA, -f FILENAME_DATA
+                        input data file (default: ./datasets/dataset_test.csv)
+  --index_col INDEX_COL
+                        index_col (default: None)
+
 ```
   
 ## Examples
 
 ```shell script
-./train.py -m -g=full
-./predict.py 240000 74000
+./logreg_train.py.py -m
+./logreg_predict.py
 ```
-
-```shell script
-./train.py -m -p -f=weights_heights.csv
-./predict.py 64.39693 68.02403 71.23661 67.50812 76.92387
-```  
-
-```shell script
-./train.py -m -f=boston.csv
-./predict.py 0.02731,0.0,7.07,0.0,0.469,6.421,78.9,4.9671,2.0,242.0,17.8,396.9,9.14
-```  
-
-## Data
-__data.csv__ - Dependence of the rates of the car mileage (km.)
-
-__weights_heights.csv__ -  Dependence of the weight from human height (inc.)
-
-__boston.csv__ - Dependence of housing prices on a variety of indicators
