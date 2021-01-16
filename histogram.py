@@ -30,16 +30,19 @@ if __name__ == '__main__':
         else:
             ALPHA_TRANSPARENCY = 0.25
         try:
-            sns.histplot(data=df, x=column, hue=COURSE_COLUMN, ax=ax,
+            COURSE_COLUMN = COURSE_COLUMN if COURSE_COLUMN in df else None
+            sns.histplot(data=df, x=column, ax=ax, hue=COURSE_COLUMN,
                          alpha=ALPHA_TRANSPARENCY)
-            plt.setp(ax.get_legend().get_texts(), fontsize=6)
-            plt.setp(ax.get_legend().get_title(), fontsize=10)
+            if ax.get_legend():
+                plt.setp(ax.get_legend().get_texts(), fontsize=6)
+                plt.setp(ax.get_legend().get_title(), fontsize=10)
         except KeyError:
             print('Invalid csv file')
             sys.exit()
         except Exception as err:  # pylint: disable=broad-except
             print("Невозможно построить график, проверьте вводные параметры. "
                   "Error '{0}' occured. Arguments {1}.".format(err, err.args))
+            raise err
             sys.exit()
 
     show_graph(fig, args.plot_filename)

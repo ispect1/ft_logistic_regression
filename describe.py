@@ -21,14 +21,15 @@ def print_describe_matrix(mdf, is_transpose=False):
 
     data = mdf.describe()
     columns = data.columns
-    index = data.index
+    indexs = data.index
 
     if is_transpose:
         data = data.T
-        index = columns
+        indexs, columns = columns, indexs
+
     row_format = "|{:<12}" * (len(columns) + 1)
-    print(row_format.format("", *map(_transform_string, index)) + '|')
-    for name, row in data.items():
+    print(row_format.format("", *map(_transform_string, columns)) + '|')
+    for name, row in data.iterrows():
         try:
             sorted_row = [f'{value}'[:9] for value in row.values]
             print(row_format.format(

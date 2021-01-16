@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Train model"""
-import argparse
 import json
+import argparse
 import sys
 from models.ml import MyLogisticRegression, Scaler
 from models.my_frame import HogwartsFrame
 from utils.metrics import accuracy
-from config import (TRAIN_CSV_FILE, COURSE_COLUMN, MAX_ITER, ETA,
-                    WEIGHTS_DATA_PATH)
+from config import COURSE_COLUMN, MAX_ITER, ETA, WEIGHTS_DATA_PATH
 
 
 def main(args):
@@ -21,10 +20,15 @@ def main(args):
     """
     log_reg = MyLogisticRegression()
     scaler = Scaler()
-    table = HogwartsFrame.read_csv(args.filename_data,
-                                   index_col=args.index_col)
+    try:
+        table = HogwartsFrame.read_csv(args.filename_data,
+                                       index_col=args.index_col)
+    except FileNotFoundError:
+        print(f'File {args.filename_data} not found')
+        sys.exit()
     y_true = table[args.name_target_column]
-    table = table[table.number_columns].fillna(0)
+    table = table[[feature for feature in table.number_columns
+                   if feature != args.name_target_column]].fillna(0)
     table = table.values
     scaler_df = scaler.fit_transform(table)
     if not sum(map(lambda x: x == x, y_true)):  # pylint: disable=R0124
@@ -40,17 +44,16 @@ def main(args):
                   file_descriptor, indent=4)
     if args.metric:
         predict = log_reg.predict(scaler_df)
-        print(f'Accuracy: {accuracy(y_true, predict)**0.5}')
+        print(f'Accuracy: {accuracy(y_true, predict)}')
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Train  model',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(dest='filename_data', help='input data file')
     parser.add_argument('--metric', '-m', dest='metric', action='store_true',
                         help='calculate metric')
-    parser.add_argument('--filename_data', '-f', dest='filename_data',
-                        action='store', help='input data file', required=True)
     parser.add_argument('--name_target_column', '-n',
                         dest='name_target_column',
                         action='store', help='target column naming',
@@ -71,4 +74,3 @@ if __name__ == "__main__":
     except Exception as err:  # pylint: disable=broad-except
         print(f'Неаозможно обучить модель. '
               f'Проверьте вводные параметры и файлы.\n{err.args}')
-        raise err

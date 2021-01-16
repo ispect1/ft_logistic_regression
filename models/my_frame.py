@@ -2,7 +2,7 @@
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from collections import defaultdict
-from utils.ft_math import var, mean
+from utils.ft_math import mean, var
 
 
 class HogwartsFrame(pd.DataFrame):
@@ -33,7 +33,7 @@ class HogwartsFrame(pd.DataFrame):
         Returns:
             Словарь столбец/строка: посчитанное значение по каждой колонке
         """
-        return self.var(column)
+        return self.var(column) ** 0.5
 
     def min(self, column):
         """

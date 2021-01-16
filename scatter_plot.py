@@ -14,6 +14,7 @@ if __name__ == '__main__':
                                 index_col=args.index_col)
 
     try:
+        COURSE_COLUMN = COURSE_COLUMN if COURSE_COLUMN in df else None
         plot = sns.scatterplot(data=df, x=X_SCATTER_PLOT_COLUMN,
                                y=Y_SCATTER_PLOT_COLUMN, hue=COURSE_COLUMN)
     except Exception as err:  # pylint: disable=broad-except
